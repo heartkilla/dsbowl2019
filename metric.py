@@ -10,6 +10,15 @@ def allocate_to_rate(y_pred, thresholds):
     return rates
 
 
+def get_thresholds_from_dist(y_true, y_pred):
+    """Calculates thresholds for raw predictions
+    so as to follow the true distribution.
+    """
+    idxs = np.cumsum(np.bincount(y_true))[:-1]
+    idxs = (idxs * y_pred.size / y_true.size).astype(int)
+    return np.sort(y_pred)[idxs]
+
+
 @jit
 def qwk(a1, a2):
     """
