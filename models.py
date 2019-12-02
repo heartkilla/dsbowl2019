@@ -51,7 +51,8 @@ class LGBMModel:
                               feval=partial(eval_qwk_lgb_regr, tr_mean=tr_mean, tr_std=tr_std),
                               num_boost_round=self.num_boost_round,
                               early_stopping_rounds=self.early_stopping_rounds,
-                              verbose_eval=self.verbose_eval)
+                              verbose_eval=self.verbose_eval,
+                              categorical_feature=['world'])
 
             self.models.append(model)
 
