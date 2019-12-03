@@ -25,7 +25,9 @@ if __name__ == '__main__':
     y = X['accuracy_group']
 
     model = LGBMModel(params=config.lgb_params,
-                      folds=StratifiedKFold(n_splits=config.n_folds, shuffle=True, random_state=73),
+                      folds=[StratifiedKFold(n_splits=config.n_folds, shuffle=True, random_state=73),
+                             StratifiedKFold(n_splits=config.n_folds, shuffle=True, random_state=74),
+                             StratifiedKFold(n_splits=config.n_folds, shuffle=True, random_state=75)],
                       cols_to_drop=['installation_id', 'accuracy_group'],
                       group_col='installation_id',
                       **config.lgb_train_params)
