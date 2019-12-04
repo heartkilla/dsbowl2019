@@ -21,7 +21,7 @@ if __name__ == '__main__':
     for col in count_cols:
         X[col] = X[col] / X['accumulated_actions']
 
-    to_drop = ['accumulated_actions', 'accumulated_accuracy_group', 'accumulated_correct_attempts', 'accumulated_uncorrect_attempts']
+    to_drop = ['accumulated_accuracy_group', 'accumulated_correct_attempts', 'accumulated_uncorrect_attempts']
     cols_to_drop = [col for col in X.columns if ('event_id' in col or col in to_drop)]
     X = X.drop(columns=cols_to_drop + useless_event_feats)
 
