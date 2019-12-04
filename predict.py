@@ -12,6 +12,10 @@ if __name__ == '__main__':
     with open('./checkpoints/model.pkl', 'rb') as fin:
         model = pickle.load(fin)
 
+    count_cols = [col for col in X.columns if 'count' in col]
+    for col in count_cols:
+        X[col] = X[col] / X['accumulated_actions']
+
     preds = model.predict(X)
 
     sample_submission['accuracy_group'] = preds.astype(int)

@@ -58,7 +58,7 @@ class LGBMModel:
             self.models.append(model)
 
             val_pred = model.predict(X_val)
-            val_pred = tr_mean + (val_pred - tr_mean) / (val_pred.std() / tr_std)
+            val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
             thresholds = [0.5, 1.5, 2.5]
             val_pred = allocate_to_rate(val_pred, thresholds)
             self.oof_train[val_index] = val_pred
@@ -78,7 +78,7 @@ class LGBMModel:
 
         for i, model in enumerate(self.models):
             pred = model.predict(X)
-            pred = self.tr_means[i] + (pred - self.tr_means[i]) / (pred.std() / self.tr_stds[i])
+            pred = self.tr_means[i] + (pred - pred.mean()) / (pred.std() / self.tr_stds[i])
             preds += pred
         preds /= len(self.models)
 
