@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import lightgbm as lgb
 
-from metric import eval_qwk_lgb_regr, allocate_to_rate
+from metric import eval_qwk_lgb_regr, allocate_to_rate, qwk
 
 
 warnings.filterwarnings("ignore")
@@ -29,6 +29,7 @@ class LGBMModel:
 
     def fit(self, X, y):
         self.columns = X.columns.drop(self.cols_to_drop)
+        self.oof_train = np.zeros(len(X))
 
         for n_fold, (tr_index, val_index) in enumerate(self.folds.split(X, y, X[self.group_col])):
             print(f'Fold {n_fold + 1}:')
@@ -56,6 +57,12 @@ class LGBMModel:
 
             self.models.append(model)
 
+            val_pred = model.predict(X_val)
+            val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
+            thresholds = [0.5, 1.5, 2.5]
+            val_pred = allocate_to_rate(val_pred, thresholds)
+            self.oof_train[val_index] = val_pred
+
             for dataset in ['training', 'valid_1']:
                 self.scores[dataset].append(model.best_score[dataset]['kappa'])
 
@@ -63,6 +70,7 @@ class LGBMModel:
 
         print(f'Train mean QWK: {np.mean(self.scores["training"]):.6f}+/-{np.std(self.scores["training"]):.6f}')
         print(f'CV mean QWK: {np.mean(self.scores["valid_1"]):.6f}+/-{np.std(self.scores["valid_1"]):.6f}')
+        print(f'CV OOF QWK: {qwk(y, self.oof_train):.6f}')
 
     def predict(self, X):
         X = X.drop(columns=self.cols_to_drop)[self.columns]
