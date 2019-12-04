@@ -10,7 +10,7 @@ from models import LGBMModel
 if __name__ == '__main__':
     X = pd.read_csv(config.preprocessed_train_path)
 
-    useless_events = [2081, 2070, 2075, 4050, 4080]
+    useless_events = [2081, 2070, 2075, 4050, 4080, 'Treasure Map', 'Heavy', 'Rulers', 'Honey Cake']
     useless_event_feats = []
     for col in X.columns:
         for ev in useless_events:
