@@ -29,39 +29,37 @@ class LGBMModel:
 
     def fit(self, X, y):
         self.columns = X.columns.drop(self.cols_to_drop)
-        for kfold in self.folds:
-            i = 1
-            for n_fold, (tr_index, val_index) in enumerate(kfold.split(X, y, X[self.group_col])):
-                print(f'Fold {i}:{n_fold + 1}:')
 
-                X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
-                y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
+        for n_fold, (tr_index, val_index) in enumerate(self.folds.split(X, y, X[self.group_col])):
+            print(f'Fold {n_fold + 1}:')
 
-                X_tr, X_val = X_tr.drop(columns=self.cols_to_drop), X_val.drop(columns=self.cols_to_drop)
+            X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
+            y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-                d_tr = lgb.Dataset(X_tr, y_tr)
-                d_val = lgb.Dataset(X_val, y_val)
+            X_tr, X_val = X_tr.drop(columns=self.cols_to_drop), X_val.drop(columns=self.cols_to_drop)
 
-                tr_mean = y_tr.mean()
-                self.tr_means.append(tr_mean)
-                tr_std = y_tr.std()
-                self.tr_stds.append(tr_std)
+            d_tr = lgb.Dataset(X_tr, y_tr)
+            d_val = lgb.Dataset(X_val, y_val)
 
-                model = lgb.train(self.params, d_tr,
-                                  valid_sets=[d_tr, d_val],
-                                  feval=partial(eval_qwk_lgb_regr, tr_mean=tr_mean, tr_std=tr_std),
-                                  num_boost_round=self.num_boost_round,
-                                  early_stopping_rounds=self.early_stopping_rounds,
-                                  verbose_eval=self.verbose_eval,
-                                  categorical_feature=['world'])
+            tr_mean = y_tr.mean()
+            self.tr_means.append(tr_mean)
+            tr_std = y_tr.std()
+            self.tr_stds.append(tr_std)
 
-                self.models.append(model)
+            model = lgb.train(self.params, d_tr,
+                              valid_sets=[d_tr, d_val],
+                              feval=partial(eval_qwk_lgb_regr, tr_mean=tr_mean, tr_std=tr_std),
+                              num_boost_round=self.num_boost_round,
+                              early_stopping_rounds=self.early_stopping_rounds,
+                              verbose_eval=self.verbose_eval,
+                              categorical_feature=['world'])
 
-                for dataset in ['training', 'valid_1']:
-                    self.scores[dataset].append(model.best_score[dataset]['kappa'])
+            self.models.append(model)
 
-                print('-' * 50)
-            i += 1
+            for dataset in ['training', 'valid_1']:
+                self.scores[dataset].append(model.best_score[dataset]['kappa'])
+
+            print('-' * 50)
 
         print(f'Train mean QWK: {np.mean(self.scores["training"]):.6f}+/-{np.std(self.scores["training"]):.6f}')
         print(f'CV mean QWK: {np.mean(self.scores["valid_1"]):.6f}+/-{np.std(self.scores["valid_1"]):.6f}')

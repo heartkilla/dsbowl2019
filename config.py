@@ -15,7 +15,7 @@ n_folds = 5
 
 lgb_params = {'objective': 'mse',
               'boosting': 'gbdt',
-              'metric': 'None',
+              'metric': 'rmse',
               'num_leaves': 38,
               'max_depth': 7,
               'min_data_in_leaf': 60,
