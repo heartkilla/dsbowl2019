@@ -13,7 +13,8 @@ counts = ['event_code', 'event_id', 'title', 'title_event_code']
 
 n_folds = 5
 
-lgb_params = {'objective': 'mse',
+lgb_params = {'objective': 'huber',
+              'alpha': 2.5,
               'boosting': 'gbdt',
               'metric': 'None',
               'num_leaves': 25,
