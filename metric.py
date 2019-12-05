@@ -54,7 +54,7 @@ def eval_qwk_lgb_regr(y_pred, train_data, tr_mean, tr_std):
     Fast QWK eval function for lgb.
     """
     labels = train_data.get_label()
-    y_pred = tr_mean + (y_pred - y_pred.mean()) / (y_pred.std() / tr_std)
+    y_pred = tr_mean + (y_pred - tr_mean) / (y_pred.std() / tr_std)
     thresholds = [0.5, 1.5, 2.5]
     y_pred = allocate_to_rate(y_pred, thresholds)
 
