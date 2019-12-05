@@ -31,11 +31,17 @@ class LGBMModel:
         self.columns = X.columns.drop(self.cols_to_drop)
         self.oof_train = np.zeros(len(X))
 
+        rand_scores = []
+
         for n_fold, (tr_index, val_index) in enumerate(self.folds.split(X, y, X[self.group_col])):
             print(f'Fold {n_fold + 1}:')
 
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
+
+            X_rands = [X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True) for i in range(5)]
+            y_rands = [X_rand['accuracy_group'] for X_rand in X_rands]
+            X_rands = [X_rand.drop(columns=self.cols_to_drop) for X_rand in X_rands]
 
             X_tr, X_val = X_tr.drop(columns=self.cols_to_drop), X_val.drop(columns=self.cols_to_drop)
 
@@ -57,11 +63,15 @@ class LGBMModel:
 
             self.models.append(model)
 
-            val_pred = model.predict(X_val)
-            val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
-            thresholds = [0.5, 1.5, 2.5]
-            val_pred = allocate_to_rate(val_pred, thresholds)
-            self.oof_train[val_index] = val_pred
+            for i in range(5):
+                val_pred = model.predict(X_rands[i])
+                val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
+                thresholds = [0.5, 1.5, 2.5]
+                val_pred = allocate_to_rate(val_pred, thresholds)
+                score = qwk(y_rands[i], val_pred)
+                print(f'rand qwk: {score:.6f}')
+                rand_scores.append(score)
+            #self.oof_train[val_index] = val_pred
 
             for dataset in ['training', 'valid_1']:
                 self.scores[dataset].append(model.best_score[dataset]['kappa'])
@@ -71,6 +81,8 @@ class LGBMModel:
         print(f'Train mean QWK: {np.mean(self.scores["training"]):.6f}+/-{np.std(self.scores["training"]):.6f}')
         print(f'CV mean QWK: {np.mean(self.scores["valid_1"]):.6f}+/-{np.std(self.scores["valid_1"]):.6f}')
         print(f'CV OOF QWK: {qwk(y, self.oof_train):.6f}')
+
+        print(f'CV random QWK: {np.mean(rand_scores):.6f}+/-{np.std(rand_scores):.6f}')
 
     def predict(self, X):
         X = X.drop(columns=self.cols_to_drop)[self.columns]
