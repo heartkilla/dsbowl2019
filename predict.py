@@ -16,6 +16,8 @@ if __name__ == '__main__':
     for col in count_cols:
         X[col] = X[col] / X['accumulated_actions']
 
+    X['accuracy'] = 0
+
     preds = model.predict(X)
 
     sample_submission['accuracy_group'] = preds.astype(int)

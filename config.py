@@ -9,7 +9,7 @@ preprocessed_test_path = './data/preprocessed_test.csv'
 # no different categories in train/test for now but be careful
 cat_cols = ['title', 'world']
 
-counts = ['event_code', 'event_id', 'title', 'title_event_code']
+counts = ['event_code', 'title', 'title_event_code']
 
 n_folds = 5
 
@@ -23,7 +23,7 @@ lgb_params = {'objective': 'huber',
               'learning_rate': 0.01,
               'bagging_fraction': 0.4,
               'bagging_freq': 1,
-              'feature_fraction': 0.3,
+              'feature_fraction': 0.7,
               'feature_fraction_seed': 44,
               'lambda_l1': 0,
               'lambda_l2': 3,

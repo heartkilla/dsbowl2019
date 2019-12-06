@@ -26,14 +26,13 @@ class LGBMModel:
         self.tr_means = []
         self.tr_stds = []
         self.scores = {'training': [], 'valid_1': []}
-        self.map_groups = [
-                             'acc_Bird Measurer (Assessment)',
-                             'acc_Cart Balancer (Assessment)',
-                             'acc_Cauldron Filler (Assessment)',
-                             'acc_Chest Sorter (Assessment)',
-                             'acc_Mushroom Sorter (Assessment)',
-                             'accumulated_accuracy',
-                             'duration_mean']
+        self.map_groups = ['acc_Bird Measurer (Assessment)',
+                           'acc_Cart Balancer (Assessment)',
+                           'acc_Cauldron Filler (Assessment)',
+                           'acc_Chest Sorter (Assessment)',
+                           'acc_Mushroom Sorter (Assessment)',
+                           'accumulated_accuracy',
+                           'duration_mean']
         self.title_mappings = []
         self.world_mappings = []
 
@@ -41,6 +40,8 @@ class LGBMModel:
         self.columns = X.columns.drop(self.cols_to_drop)
         self.oof_train = np.zeros(len(X))
 
+        oof_rand = []
+        oof_rand_true = []
         rand_scores = []
 
         for n_fold, (tr_index, val_index) in enumerate(self.folds.split(X, y, X[self.group_col])):
@@ -84,15 +85,22 @@ class LGBMModel:
 
             self.models.append(model)
 
+            val_pred = model.predict(X_val)
+            val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
+            thresholds = [0.5, 1.5, 2.5]
+            val_pred = allocate_to_rate(val_pred, thresholds)
+            self.oof_train[val_index] = val_pred
+
             for i in range(5):
                 val_pred = model.predict(X_rands[i])
                 val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
                 thresholds = [0.5, 1.5, 2.5]
                 val_pred = allocate_to_rate(val_pred, thresholds)
+                oof_rand.extend(val_pred)
+                oof_rand_true.extend(y_rands[i])
                 score = qwk(y_rands[i], val_pred)
                 print(f'rand qwk: {score:.6f}')
                 rand_scores.append(score)
-            #self.oof_train[val_index] = val_pred
 
             for dataset in ['training', 'valid_1']:
                 self.scores[dataset].append(model.best_score[dataset]['kappa'])
@@ -104,6 +112,7 @@ class LGBMModel:
         print(f'CV OOF QWK: {qwk(y, self.oof_train):.6f}')
 
         print(f'CV random QWK: {np.mean(rand_scores):.6f}+/-{np.std(rand_scores):.6f}')
+        print(f'CV OOF random QWK: {qwk(oof_rand_true, oof_rand):.6f}')
 
     def predict(self, X):
         X = X.drop(columns=self.cols_to_drop)[self.columns]

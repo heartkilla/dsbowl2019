@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     model = LGBMModel(params=config.lgb_params,
                       folds=GroupKFold(n_splits=config.n_folds),  # shuffle=True, random_state=73),
-                      cols_to_drop=['installation_id', 'accuracy_group'],
+                      cols_to_drop=['installation_id', 'accuracy_group', 'accuracy'],
                       group_col='installation_id',
                       **config.lgb_train_params)
 
