@@ -19,6 +19,9 @@ if __name__ == '__main__':
     X['weekday_sin'] = X['weekday'].map(lambda x: np.sin(2 * np.pi * x / 6))
     X['weekday_cos'] = X['weekday'].map(lambda x: np.cos(2 * np.pi * x / 6))
 
+    X['day_sin'] = X['day'].map(lambda x: np.sin(2 * np.pi * x / 6))
+    X['day_cos'] = X['day'].map(lambda x: np.cos(2 * np.pi * x / 6))
+
     X['mean_time_per_day'] = X['total_time'] / X['days_since_installation']
 
     preds = model.predict(X)
