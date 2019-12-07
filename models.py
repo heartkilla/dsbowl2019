@@ -50,17 +50,6 @@ class LGBMModel:
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-            for col in self.map_groups:
-                mapping = X_tr.groupby('title')[col].mean()
-                self.title_mappings.append(mapping)
-                X_tr[col + '_mean_title'] = X_tr[col].map(mapping)
-                X_val[col + '_mean_title'] = X_val[col].map(mapping)
-
-                mapping = X_tr.groupby('world')[col].mean()
-                self.world_mappings.append(mapping)
-                X_tr[col + '_mean_world'] = X_tr[col].map(mapping)
-                X_val[col + '_mean_world'] = X_val[col].map(mapping)
-
             X_rands = [X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True) for i in range(5)]
             y_rands = [X_rand['accuracy_group'] for X_rand in X_rands]
             X_rands = [X_rand.drop(columns=self.cols_to_drop) for X_rand in X_rands]
@@ -119,9 +108,6 @@ class LGBMModel:
         preds = np.zeros(X.shape[0])
 
         for i, model in enumerate(self.models):
-            for col in self.map_groups:
-                X[col + '_mean_title'] = X[col].map(self.title_mappings[i])
-                X[col + '_mean_world'] = X[col].map(self.world_mappings[i])
             pred = model.predict(X)
             pred = self.tr_means[i] + (pred - pred.mean()) / (pred.std() / self.tr_stds[i])
             preds += pred

@@ -1,5 +1,6 @@
 import pickle
 
+import numpy as np
 import pandas as pd
 
 import config
@@ -12,11 +13,13 @@ if __name__ == '__main__':
     with open('./checkpoints/model.pkl', 'rb') as fin:
         model = pickle.load(fin)
 
-    count_cols = [col for col in X.columns if 'count' in col]
-    for col in count_cols:
-        X[col] = X[col] / X['accumulated_actions']
+    X['hour_sin'] = X['hour'].map(lambda x: np.sin(2 * np.pi * x / 23))
+    X['hour_cos'] = X['hour'].map(lambda x: np.cos(2 * np.pi * x / 23))
 
-    X['accuracy'] = 0
+    X['weekday_sin'] = X['weekday'].map(lambda x: np.sin(2 * np.pi * x / 6))
+    X['weekday_cos'] = X['weekday'].map(lambda x: np.cos(2 * np.pi * x / 6))
+
+    X['mean_time_per_day'] = X['total_time'] / X['days_since_installation']
 
     preds = model.predict(X)
 

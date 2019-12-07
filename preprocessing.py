@@ -46,7 +46,8 @@ def preprocess_inst(ins_group, custom_counter, dataset):
     custom_counter.reset()
 
     types = ['Clip', 'Activity', 'Assessment', 'Game']
-    type_counter = {col + '_count': 0 for col in types}
+    changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
+    type_counter = {'type_' + col + '_count': 0 for col in types}
     last_type = 0
 
     accumulated_correct_attempts = 0
@@ -57,12 +58,20 @@ def preprocess_inst(ins_group, custom_counter, dataset):
                    'Chest Sorter (Assessment)',
                    'Mushroom Sorter (Assessment)',
                    'Bird Measurer (Assessment)']
-    last_accuracy_title = {'acc_' + title: -1 for title in assessments}
+    last_accuracy_title = {'last_accuracy_' + title: np.nan for title in assessments}
     accuracy_groups = {f'{i}_group_count': 0 for i in range(4)}
     accumulated_accuracy_group = 0
     accumulated_actions = 0
+    accumulated_sessions = 0
 
     durations = []
+    total_time = 0
+    assess_times = {assess: 0 for assess in assessments}
+
+    worlds = ['NONE', 'MAGMAPEAK', 'CRYSTALCAVES', 'TREETOPCITY']
+    world_times = {world: 0 for world in worlds}
+    world_game_times = {world: 0 for world in worlds}
+    world_activity_times = {world: 0 for world in worlds}
 
     k = 0
     for game_session, session_group in ins_group.groupby('game_session',
@@ -71,6 +80,10 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         session_type = session_group['type'].iloc[0]
         session_title = session_group['title'].iloc[0]
         session_world = session_group['world'].iloc[0]
+        duration = (session_group.iloc[-1, 2] - session_group.iloc[0, 2]).seconds if len(session_group) > 1 else 0
+
+        if k == 0:
+            install_time = session_group['timestamp'].iloc[0]
 
         if session_title == 'Bird Measurer (Assessment)':
             attempt_code = 4110
@@ -84,15 +97,30 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['world'] = session_world
             for counter in custom_counter.counters.values():
                 features.update(counter)
+            features.update(changed_type_counter)
             features.update(type_counter)
             features['accumulated_correct_attempts'] = accumulated_correct_attempts
             features['accumulated_uncorrect_attempts'] = accumulated_uncorrect_attempts
             features['accumulated_accuracy'] = accumulated_accuracy / k if k > 0 else 0
             features.update(last_accuracy_title)
-            features['duration_mean'] = np.mean(durations) if durations else 0
+            features['assess_duration_mean'] = np.mean(durations) if durations else 0
+            features['assess_duration_sum'] = np.sum(durations) if durations else 0
             features.update(accuracy_groups)
             features['accumulated_accuracy_group'] = accumulated_accuracy_group / k if k > 0 else 0
             features['accumulated_actions'] = accumulated_actions
+            features['accumulated_sessions'] = accumulated_sessions
+            features['sec_since_installation'] = (session_group.iloc[0, 2] - install_time).seconds
+            features['days_since_installation'] = (session_group.iloc[0, 2] - install_time).days
+            features['weekday'] = session_group.iloc[0, 2].weekday()
+            features['day'] = session_group.iloc[0, 2].day
+            features['hour'] = session_group.iloc[0, 2].hour
+            features['total_time'] = total_time
+            features['current_title_count'] = custom_counter.counters['title']['title_' + session_title + '_count']
+            features['current_world_count'] = custom_counter.counters['world']['world_' + session_world + '_count']
+            features['current_title_total_time'] = assess_times[session_title]
+            features['current_world_total_time'] = world_times[session_world]
+            features['current_world_game_time'] = world_game_times[session_world]
+            features['current_world_activity_time'] = world_activity_times[session_world]
 
             all_attempts = session_group.query(f'event_code == {attempt_code}')
             true_attempts = all_attempts['event_data'].str.contains('"correct":true').sum()
@@ -101,8 +129,9 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             accumulated_uncorrect_attempts += false_attempts
             accuracy = true_attempts / (true_attempts + false_attempts) if (true_attempts + false_attempts) != 0 else 0
             accumulated_accuracy += accuracy
-            last_accuracy_title['acc_' + session_title] = accuracy
-            durations.append((session_group.iloc[-1, 2] - session_group.iloc[0, 2]).seconds)
+            last_accuracy_title['last_accuracy_' + session_title] = accuracy
+            durations.append(duration)
+            assess_times[session_title] += duration
 
             if accuracy == 0:
                 features['accuracy_group'] = 0
@@ -122,17 +151,32 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             k += 1
 
         for count_col in config.counts:
-            current_counter = Counter(session_group[count_col])
-            old_keys = list(current_counter.keys()).copy()
-            for key in old_keys:
-                current_counter[count_col + '_' + str(key) + '_count'] = current_counter.pop(key)
-            custom_counter.counters[count_col].update(current_counter)
+            if count_col == 'title':
+                custom_counter.counters['title']['title_' + session_title + '_count'] += 1
+            elif count_col == 'world':
+                custom_counter.counters['world']['world_' + session_world + '_count'] += 1
+            else:
+                current_counter = Counter(session_group[count_col])
+                old_keys = list(current_counter.keys()).copy()
+                for key in old_keys:
+                    current_counter[count_col + '_' + str(key) + '_count'] = current_counter.pop(key)
+                custom_counter.counters[count_col].update(current_counter)
 
         accumulated_actions += len(session_group)
 
         if last_type != session_type:
-            type_counter[session_type + '_count'] += 1
+            changed_type_counter['changed_type_' + session_type + '_count'] += 1
             last_type = session_type
+
+        type_counter['type_' + session_type + '_count'] += 1
+        accumulated_sessions += 1
+        total_time += duration
+        world_times[session_world] += duration
+
+        if session_type == 'Game':
+            world_game_times[session_world] += duration
+        elif session_type == 'Activity':
+            world_activity_times[session_world] += duration
 
     return all_assessments if dataset == 'train' else [all_assessments[-1]]
 
