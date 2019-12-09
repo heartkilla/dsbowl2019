@@ -21,9 +21,9 @@ if __name__ == '__main__':
     X['weekday_cos'] = X['weekday'].map(lambda x: np.cos(2 * np.pi * x / 6))
     X = X.drop(columns=['weekday'])
 
-    #X['day_sin'] = X['day'].map(lambda x: np.sin(2 * np.pi * x / 6))
-    #X['day_cos'] = X['day'].map(lambda x: np.cos(2 * np.pi * x / 6))
-    #X = X.drop(columns=['day'])
+    X['day_sin'] = X['day'].map(lambda x: np.sin(2 * np.pi * x / 6))
+    X['day_cos'] = X['day'].map(lambda x: np.cos(2 * np.pi * x / 6))
+    X = X.drop(columns=['day'])
 
     X['mean_time_per_day'] = X['total_time'] / X['days_since_installation']
     X['current_title_mean_time'] = X['current_title_total_time'] / X['current_title_count']
@@ -34,7 +34,11 @@ if __name__ == '__main__':
                                  'last_accuracy_Chest Sorter (Assessment)',
                                  'last_accuracy_Mushroom Sorter (Assessment)']].mean(axis=1)
     X['ratio_of_life_in_game'] = X['total_time'] / X['sec_since_installation']
-
+    X['time_per_session'] = X['total_time'] / X['accumulated_sessions']
+    X['sessions_per_day'] = X['accumulated_sessions'] / X['days_since_installation']
+    X['events_per_session'] = X['accumulated_actions'] / X['accumulated_sessions']
+    X['time_per_event'] = X['total_time'] / X['accumulated_actions']
+    X['events_per_day'] = X['accumulated_actions'] / X['days_since_installation']
     preds = model.predict(X)
 
     sample_submission['accuracy_group'] = preds.astype(int)

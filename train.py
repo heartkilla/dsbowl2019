@@ -11,13 +11,13 @@ from models import LGBMModel
 if __name__ == '__main__':
     X = pd.read_csv(config.preprocessed_train_path)
 
-    useless_events = [2081, 2070, 2075, 4050, 4080, 4110, 4220, 2050, 4235, 2035, 5010, 4230, 5000, 2040,
-                      4095, 2025, 2083, 2060]
+    #useless_events = [2081, 2070, 2075, 4050, 4080, 4110, 4220, 2050, 4235, 2035, 5010, 4230, 5000, 2040,
+    #                  4095, 2025, 2083, 2060]
     useless_event_feats = []
-    for col in X.columns:
-        for ev in useless_events:
-            if str(ev) in col:
-                useless_event_feats.append(col)
+    #for col in X.columns:
+    #    for ev in useless_events:
+    #        if str(ev) in col:
+    #            useless_event_feats.append(col)
 
     X['hour_sin'] = X['hour'].map(lambda x: np.sin(2 * np.pi * x / 23))
     X['hour_cos'] = X['hour'].map(lambda x: np.cos(2 * np.pi * x / 23))
@@ -40,6 +40,11 @@ if __name__ == '__main__':
                                  'last_accuracy_Chest Sorter (Assessment)',
                                  'last_accuracy_Mushroom Sorter (Assessment)']].mean(axis=1)
     X['ratio_of_life_in_game'] = X['total_time'] / X['sec_since_installation']
+    X['time_per_session'] = X['total_time'] / X['accumulated_sessions']
+    X['sessions_per_day'] = X['accumulated_sessions'] / X['days_since_installation']
+    X['events_per_session'] = X['accumulated_actions'] / X['accumulated_sessions']
+    X['time_per_event'] = X['total_time'] / X['accumulated_actions']
+    X['events_per_day'] = X['accumulated_actions'] / X['days_since_installation']
 
     to_drop = []
     cols_to_drop = [col for col in X.columns if ('event_id' in col or 'changed' in col)]

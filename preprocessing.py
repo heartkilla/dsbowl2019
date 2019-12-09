@@ -2,6 +2,7 @@ import copy
 import pickle
 from collections import Counter
 from shutil import copyfile
+import json
 
 import numpy as np
 import pandas as pd
@@ -46,7 +47,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
     custom_counter.reset()
 
     types = ['Clip', 'Activity', 'Assessment', 'Game']
-    changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
+    #changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
     type_counter = {'type_' + col + '_count': 0 for col in types}
     last_type = 0
 
@@ -66,12 +67,17 @@ def preprocess_inst(ins_group, custom_counter, dataset):
 
     durations = []
     total_time = 0
-    assess_times = {assess: 0 for assess in assessments}
+    title_times = {title + '_title_total_time': 0 for title in custom_counter.count_unique_keys['title']}
 
     worlds = ['NONE', 'MAGMAPEAK', 'CRYSTALCAVES', 'TREETOPCITY']
-    world_times = {world: 0 for world in worlds}
-    world_game_times = {world: 0 for world in worlds}
-    world_activity_times = {world: 0 for world in worlds}
+    world_times = {world + '_world_total_time': 0 for world in worlds}
+    world_game_times = {world + '_world_game_time': 0 for world in worlds}
+    world_activity_times = {world + '_world_activity_time': 0 for world in worlds}
+
+    accumulated_misses = 0
+    all_types_accumulated_correct_attempts = 0
+    all_types_accumulated_uncorrect_attempts = 0
+    change_type_count = 0
 
     k = 0
     for game_session, session_group in ins_group.groupby('game_session',
@@ -97,7 +103,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['world'] = session_world
             for counter in custom_counter.counters.values():
                 features.update(counter)
-            features.update(changed_type_counter)
+            #features.update(changed_type_counter)
             features.update(type_counter)
             features['accumulated_correct_attempts'] = accumulated_correct_attempts
             features['accumulated_uncorrect_attempts'] = accumulated_uncorrect_attempts
@@ -117,10 +123,19 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['total_time'] = total_time
             features['current_title_count'] = custom_counter.counters['title']['title_' + session_title + '_count']
             features['current_world_count'] = custom_counter.counters['world']['world_' + session_world + '_count']
-            features['current_title_total_time'] = assess_times[session_title]
-            features['current_world_total_time'] = world_times[session_world]
-            features['current_world_game_time'] = world_game_times[session_world]
-            features['current_world_activity_time'] = world_activity_times[session_world]
+            features['current_title_total_time'] = title_times[session_title + '_title_total_time']
+            features['current_world_total_time'] = world_times[session_world + '_world_total_time']
+            features['current_world_game_time'] = world_game_times[session_world + '_world_game_time']
+            features['current_world_activity_time'] = world_activity_times[session_world + '_world_activity_time']
+            features['accumulated_misses'] = accumulated_misses
+            features['all_types_accumulated_correct_attempts'] = all_types_accumulated_correct_attempts
+            features['all_types_accumulated_uncorrect_attempts'] = all_types_accumulated_uncorrect_attempts
+            features['change_type_count'] = change_type_count
+            features.update(world_times)
+            features.update(world_game_times)
+            features.update(world_activity_times)
+            features.update(title_times)
+
 
             all_attempts = session_group.query(f'event_code == {attempt_code}')
             true_attempts = all_attempts['event_data'].str.contains('"correct":true').sum()
@@ -131,7 +146,6 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             accumulated_accuracy += accuracy
             last_accuracy_title['last_accuracy_' + session_title] = accuracy
             durations.append(duration)
-            assess_times[session_title] += duration
 
             if accuracy == 0:
                 features['accuracy_group'] = 0
@@ -165,18 +179,23 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         accumulated_actions += len(session_group)
 
         if last_type != session_type:
-            changed_type_counter['changed_type_' + session_type + '_count'] += 1
+            change_type_count += 1
             last_type = session_type
 
         type_counter['type_' + session_type + '_count'] += 1
         accumulated_sessions += 1
         total_time += duration
-        world_times[session_world] += duration
+        world_times[session_world + '_world_total_time'] += duration
+        title_times[session_title + '_title_total_time'] += duration
 
         if session_type == 'Game':
-            world_game_times[session_world] += duration
+            world_game_times[session_world + '_world_game_time'] += duration
         elif session_type == 'Activity':
-            world_activity_times[session_world] += duration
+            world_activity_times[session_world + '_world_activity_time'] += duration
+
+        accumulated_misses += session_group['event_data'][session_group['event_data'].str.contains('"misses"')].map(lambda x: int(json.loads(x)['misses'])).sum()
+        all_types_accumulated_correct_attempts += session_group['event_data'].str.contains('"correct":true').sum()
+        all_types_accumulated_uncorrect_attempts += session_group['event_data'].str.contains('"correct":false').sum()
 
     return all_assessments if dataset == 'train' else [all_assessments[-1]]
 
@@ -228,4 +247,4 @@ def main(dataset='train'):
 
 
 if __name__ == '__main__':
-    main('test')
+    main('train')
