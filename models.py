@@ -72,7 +72,7 @@ class LGBMModel:
                               num_boost_round=self.num_boost_round,
                               early_stopping_rounds=self.early_stopping_rounds,
                               verbose_eval=self.verbose_eval,
-                              categorical_feature=['world', 'title'])
+                              categorical_feature=['world'])
 
             self.models.append(model)
 
