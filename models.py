@@ -52,7 +52,7 @@ class LGBMModel:
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-            X_rands = [X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True) for i in range(5)]
+            X_rands = [X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True) for i in range(10)]
             y_rands = [X_rand['accuracy_group'] for X_rand in X_rands]
             X_rands = [X_rand.drop(columns=self.cols_to_drop) for X_rand in X_rands]
 
@@ -72,7 +72,7 @@ class LGBMModel:
                               num_boost_round=self.num_boost_round,
                               early_stopping_rounds=self.early_stopping_rounds,
                               verbose_eval=self.verbose_eval,
-                              categorical_feature=['world'])
+                              categorical_feature=['world', 'title'])
 
             self.models.append(model)
 
@@ -82,7 +82,7 @@ class LGBMModel:
             val_pred = allocate_to_rate(val_pred, thresholds)
             self.oof_train[val_index] = val_pred
 
-            for i in range(5):
+            for i in range(10):
                 val_pred = model.predict(X_rands[i])
                 val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
                 thresholds = [0.5, 1.5, 2.5]
