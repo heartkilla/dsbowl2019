@@ -287,9 +287,9 @@ def main(dataset='train'):
     if dataset == 'train':
         df.to_csv(config.preprocessed_train_path, index=False)
     elif dataset == 'test_for_train':
-        df.to_csv(config.preprocessed_test_path, index=False)
+        df.to_csv(config.preprocessed_test_for_train_path, index=False)
     elif dataset == 'test':
-        df.to_csv(config.train_labels_path, index=False)
+        df.to_csv(config.preprocessed_test_path, index=False)
 
 
 if __name__ == '__main__':
