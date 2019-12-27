@@ -284,7 +284,12 @@ def main(dataset='train'):
 
     df = df.reindex(sorted(df.columns), axis=1)
 
-    df.to_csv(config.preprocessed_train_path, index=False)
+    if dataset == 'train':
+		df.to_csv(config.preprocessed_train_path, index=False)
+	elif dataset == 'test_for_train':
+		df.to_csv(config.preprocessed_test_path, index=False)
+	elif dataset == 'test':
+		df.to_csv(config.train_labels_path, index=False)
 
 
 if __name__ == '__main__':
