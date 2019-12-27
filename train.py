@@ -10,7 +10,7 @@ from models import LGBMModel
 
 if __name__ == '__main__':
     X = pd.read_csv(config.preprocessed_train_path)
-    X_add = pd.read_csv(config.preprocessed_test_path)
+    X_add = pd.read_csv(config.preprocessed_test_for_train_path)
     X = pd.concat([X, X_add])
 
     #useless_events = [2081, 2070, 2075, 4050, 4080, 4110, 4220, 2050, 4235, 2035, 5010, 4230, 5000, 2040,
