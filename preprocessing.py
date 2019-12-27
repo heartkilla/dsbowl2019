@@ -284,7 +284,7 @@ def main(dataset='train'):
 
     df = df.reindex(sorted(df.columns), axis=1)
 
-    df.to_csv(f'./data/preprocessed_{dataset}.csv', index=False)
+    df.to_csv(config.preprocessed_train_path, index=False)
 
 
 if __name__ == '__main__':
