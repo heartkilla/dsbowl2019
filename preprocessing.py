@@ -3,6 +3,7 @@ import pickle
 from collections import Counter
 from shutil import copyfile
 import json
+import sys
 
 import numpy as np
 import pandas as pd
@@ -99,7 +100,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         else:
             attempt_code = 4100
 
-        if session_type == 'Assessment' and (dataset == 'test' or len(session_group) > 1):
+        if session_type == 'Assessment' and (dataset != 'train' or len(session_group) > 1):
             features = {}
             features['installation_id'] = session_inst_id
             features['title'] = session_title
@@ -194,7 +195,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             accuracy_groups[f"{features['accuracy_group']}_group_count"] += 1
             accumulated_accuracy_group += features['accuracy_group']
 
-            if true_attempts + false_attempts > 0 or dataset == 'test':
+            if true_attempts + false_attempts > 0 or dataset != 'train':
                 all_assessments.append(features)
 
             k += 1
@@ -232,7 +233,12 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         all_types_accumulated_correct_attempts += session_group['event_data'].str.contains('"correct":true').sum()
         all_types_accumulated_uncorrect_attempts += session_group['event_data'].str.contains('"correct":false').sum()
 
-    return all_assessments if dataset == 'train' else [all_assessments[-1]]
+    if dataset == 'train':
+        return all_assessments
+    elif dataset == 'test_for_train':
+        return all_assessments[:-1]
+    else:
+        return [all_assessments[-1]]
 
 
 def iterative_preprocessing(data, dataset, counter_path='./checkpoints/counter.pkl'):
@@ -282,4 +288,4 @@ def main(dataset='train'):
 
 
 if __name__ == '__main__':
-    main('test')
+    main(sys.argv[1])

@@ -111,9 +111,11 @@ class LGBMModel:
 
         for i, model in enumerate(self.models):
             pred = model.predict(X)
-            pred = self.tr_means[i] + (pred - pred.mean()) / (pred.std() / self.tr_stds[i])
+            #pred = self.tr_means[i] + (pred - pred.mean()) / (pred.std() / self.tr_stds[i])
             preds += pred
         preds /= len(self.models)
+
+        preds = 1.865448919498927 + (preds - preds.mean()) / (preds.std() / 1.266954301695134)
 
         thresholds = [0.5, 1.5, 2.5]
         preds = allocate_to_rate(preds, thresholds)

@@ -42,10 +42,10 @@ if __name__ == '__main__':
 
     count_cols = [col for col in X.columns if 'count' in col]
     for col in count_cols:
-        if 'event_code' in col:
-            X[col] = X[col] / X['accumulated_actions']
-        else:
-            X[col] = X[col] / X['accumulated_sessions']
+        #if 'event_code' in col:
+        X[col] = X[col] / X['accumulated_actions']
+        #else:
+        #    X[col] = X[col] / X['accumulated_sessions']
 
     X = X.replace({np.inf: 0})
 

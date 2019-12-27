@@ -34,15 +34,3 @@ lgb_params = {'objective': 'huber',
 lgb_train_params = {'num_boost_round': 1000000,
                     'early_stopping_rounds': 500,
                     'verbose_eval': 100}
-
-
-"""
-Train mean QWK: 0.741730+/-0.010295
-CV mean QWK: 0.599483+/-0.016011
-CV OOF QWK: 0.599560
-CV random QWK: 0.567528+/-0.028369
-CV OOF random QWK: 0.567967
-
-
-0.567814
-"""
