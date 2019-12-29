@@ -43,6 +43,34 @@ def get_interaction(data, attr_1, attr_2):
     return data
 
 
+# def process_event_ids(event_codes):
+#     # substitute only distraction events
+#     return event_codes.replace(to_replace = ["bcceccc6",
+#                              "1325467d",
+#                              "a7640a16",
+#                              "bd612267",
+#                              "15a43e5b",
+#                              "f3cd5473",
+#                              "7372e1a5",
+#                              "76babcde",
+#                              "6c517a88",
+#                              "4bb2f698",
+#                              "7dfe6d8a",
+#                              "9e34ea74",
+#                              "c952eb01",
+#                              "3ee399c3",
+#                              "7da34a02",
+#                              "565a3990",
+#                              "a44b10dc",
+#                              "acf5c23f",
+#                              "587b5989",
+#                              "a16a373e",
+#                              "a0faea5d",
+#                              "884228c8",
+#                              "5e3ea25a"],
+#                                value = "cf82af56")
+
+
 def preprocess_inst(ins_group, custom_counter, dataset):
     all_assessments = []
 
@@ -272,9 +300,10 @@ def main(dataset='train'):
         with open('./checkpoints/cat_encoder.pkl', 'rb') as fin:
             cat_encoder = pickle.load(fin)
 
+    #df["event_id"] = process_event_ids(df["event_id"])
     df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
 
-    df = get_interaction(df, 'title', 'event_code')
+    #df = get_interaction(df, 'title', 'event_code')
 
     df = iterative_preprocessing(df, dataset)
 
