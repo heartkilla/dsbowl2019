@@ -43,6 +43,10 @@ def get_interaction(data, attr_1, attr_2):
     return data
 
 
+def is_time_mismatch(duration, game_time):
+    return True if abs(duration - game_time) / game_time > 0.4 else False
+
+
 def preprocess_inst(ins_group, custom_counter, dataset):
     all_assessments = []
 
@@ -80,6 +84,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
     all_types_accumulated_correct_attempts = 0
     all_types_accumulated_uncorrect_attempts = 0
     change_type_count = 0
+    time_mismatches_count = 0
 
     accuracies = []
 
@@ -166,6 +171,8 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['all_types_accumulated_correct_attempts'] = all_types_accumulated_correct_attempts
             features['all_types_accumulated_uncorrect_attempts'] = all_types_accumulated_uncorrect_attempts
             features['change_type_count'] = change_type_count
+            # +1 is added to include the current session as well
+            features['time_mismatches_count'] = time_mismatches_count / (accumulated_sessions + 1)
             features.update(world_times)
             features.update(world_game_times)
             features.update(world_activity_times)
@@ -229,7 +236,13 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         elif session_type == 'Activity':
             world_activity_times[session_world + '_world_activity_time'] += duration
 
-        accumulated_misses += session_group['event_data'][session_group['event_data'].str.contains('"misses"')].map(lambda x: int(json.loads(x)['misses'])).sum()
+        game_time = session_group.iloc[-1]["game_time"] / 1000
+        if game_time > 0:
+            if is_time_mismatch(duration, game_time):
+                time_mismatches_count += 1
+
+        accumulated_misses += session_group['event_data'][session_group['event_data'].str.contains('"misses"')]\
+            .map(lambda x: int(json.loads(x)['misses'])).sum()
         all_types_accumulated_correct_attempts += session_group['event_data'].str.contains('"correct":true').sum()
         all_types_accumulated_uncorrect_attempts += session_group['event_data'].str.contains('"correct":false').sum()
 
