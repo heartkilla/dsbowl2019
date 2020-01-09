@@ -4,17 +4,21 @@ import warnings
 import numpy as np
 import lightgbm as lgb
 
-from metric import eval_qwk_lgb_regr, allocate_to_rate, qwk
+from metric import eval_qwk_lgb_regr, adjust_dist, allocate_to_rate, qwk
 
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 
 class LGBMModel:
-    def __init__(self, params, num_boost_round,
+    def __init__(self, params,
+                 num_boost_round,
                  early_stopping_rounds,
                  verbose_eval, folds,
-                 cols_to_drop, group_col=None):
+                 cols_to_drop,
+                 cat_feats,
+                 group_col=None,
+                 n_rand_val=10):
         self.params = params
         self.num_boost_round = num_boost_round
         self.early_stopping_rounds = early_stopping_rounds
@@ -22,29 +26,19 @@ class LGBMModel:
         self.folds = folds
         self.group_col = group_col
         self.cols_to_drop = cols_to_drop
+        self.cat_feats = cat_feats
+        self.n_rand_val = n_rand_val
         self.models = []
         self.tr_means = []
         self.tr_stds = []
         self.scores = {'training': [], 'valid_1': []}
-        self.map_groups = ['current_world_mean_time',
-                           'current_title_mean_time',
-                           'last_mean_accuracy',
-                           'current_title_count',
-                           'accumulated_accuracy',
-                           'current_world_game_time',
-                           'total_time',
-                           'accumulated_accuracy_group',
-                           'mean_time_per_day']
-        self.title_mappings = []
-        self.world_mappings = []
+        self.rand_scores = []
 
     def fit(self, X, y):
         self.columns = X.columns.drop(self.cols_to_drop)
         self.oof_train = np.zeros(len(X))
-
-        oof_rand = []
-        oof_rand_true = []
-        rand_scores = []
+        self.entire_mean = y.mean()
+        self.entire_std = y.std()
 
         for n_fold, (tr_index, val_index) in enumerate(self.folds.split(X, y, X[self.group_col])):
             print(f'Fold {n_fold + 1}:')
@@ -52,14 +46,8 @@ class LGBMModel:
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-            X_rands = [X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True) for i in range(10)]
-            y_rands = [X_rand['accuracy_group'] for X_rand in X_rands]
-            X_rands = [X_rand.drop(columns=self.cols_to_drop) for X_rand in X_rands]
-
-            X_tr, X_val = X_tr.drop(columns=self.cols_to_drop), X_val.drop(columns=self.cols_to_drop)
-
-            d_tr = lgb.Dataset(X_tr, y_tr)
-            d_val = lgb.Dataset(X_val, y_val)
+            d_tr = lgb.Dataset(X_tr.drop(columns=self.cols_to_drop), y_tr)
+            d_val = lgb.Dataset(X_val.drop(columns=self.cols_to_drop), y_val)
 
             tr_mean = y_tr.mean()
             self.tr_means.append(tr_mean)
@@ -72,26 +60,24 @@ class LGBMModel:
                               num_boost_round=self.num_boost_round,
                               early_stopping_rounds=self.early_stopping_rounds,
                               verbose_eval=self.verbose_eval,
-                              categorical_feature=['world', 'title'])
+                              categorical_feature=self.cat_feats)
 
             self.models.append(model)
 
-            val_pred = model.predict(X_val)
-            val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
-            thresholds = [0.5, 1.5, 2.5]
-            val_pred = allocate_to_rate(val_pred, thresholds)
+            val_pred = model.predict(X_val.drop(columns=self.cols_to_drop))
+            val_pred = adjust_dist(val_pred, tr_mean, tr_std)
+            val_pred = allocate_to_rate(val_pred)
             self.oof_train[val_index] = val_pred
 
-            for i in range(10):
-                val_pred = model.predict(X_rands[i])
-                val_pred = tr_mean + (val_pred - val_pred.mean()) / (val_pred.std() / tr_std)
-                thresholds = [0.5, 1.5, 2.5]
-                val_pred = allocate_to_rate(val_pred, thresholds)
-                oof_rand.extend(val_pred)
-                oof_rand_true.extend(y_rands[i])
-                score = qwk(y_rands[i], val_pred)
-                print(f'rand qwk: {score:.6f}')
-                rand_scores.append(score)
+            for i in range(self.n_rand_val):
+                X_rand = X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True)
+                y_rand = X_rand['accuracy_group']
+                rand_pred = model.predict(X_rand.drop(columns=self.cols_to_drop))
+                rand_pred = adjust_dist(rand_pred, tr_mean, tr_std)
+                rand_pred = allocate_to_rate(rand_pred)
+                score = qwk(y_rand, rand_pred)
+                print(f'Rand QWK score {i + 1}: {score:.6f}')
+                self.rand_scores.append(score)
 
             for dataset in ['training', 'valid_1']:
                 self.scores[dataset].append(model.best_score[dataset]['kappa'])
@@ -100,24 +86,21 @@ class LGBMModel:
 
         print(f'Train mean QWK: {np.mean(self.scores["training"]):.6f}+/-{np.std(self.scores["training"]):.6f}')
         print(f'CV mean QWK: {np.mean(self.scores["valid_1"]):.6f}+/-{np.std(self.scores["valid_1"]):.6f}')
-        print(f'CV OOF QWK: {qwk(y, self.oof_train):.6f}')
+        print(f'CV random QWK: {np.mean(self.rand_scores):.6f}+/-{np.std(self.rand_scores):.6f}')
 
-        print(f'CV random QWK: {np.mean(rand_scores):.6f}+/-{np.std(rand_scores):.6f}')
-        print(f'CV OOF random QWK: {qwk(oof_rand_true, oof_rand):.6f}')
-
-    def predict(self, X):
-        X = X.drop(columns=self.cols_to_drop)[self.columns]
+    def predict(self, X, entire_train_stats=False):
+        X = X[self.columns]
         preds = np.zeros(X.shape[0])
 
         for i, model in enumerate(self.models):
             pred = model.predict(X)
-            #pred = self.tr_means[i] + (pred - pred.mean()) / (pred.std() / self.tr_stds[i])
+            if not entire_train_stats:
+                pred = adjust_dist(pred, self.tr_means[i], self.tr_stds[i])
             preds += pred
         preds /= len(self.models)
 
-        preds = 1.865448919498927 + (preds - preds.mean()) / (preds.std() / 1.266954301695134)
-
-        thresholds = [0.5, 1.5, 2.5]
-        preds = allocate_to_rate(preds, thresholds)
+        if entire_train_stats:
+            preds = adjust_dist(preds, self.entire_mean, self.entire_std)
+        preds = allocate_to_rate(preds)
 
         return preds

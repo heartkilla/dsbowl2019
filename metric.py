@@ -2,21 +2,17 @@ import numpy as np
 from numba import jit
 
 
-def allocate_to_rate(y_pred, thresholds):
+def adjust_dist(y_pred, tr_mean, tr_std):
+    """Adjusts the prediction distribution following the paper."""
+    return tr_mean + (y_pred - y_pred.mean()) / (y_pred.std() / tr_std)
+
+
+def allocate_to_rate(y_pred):
     """Allocates raw predictions to rates."""
     rates = np.zeros(y_pred.size, dtype=int)
     for i in range(3):
-        rates[y_pred >= thresholds[i]] = i + 1
+        rates[y_pred >= i + 0.5] = i + 1
     return rates
-
-
-def get_thresholds_from_dist(y_true, y_pred):
-    """Calculates thresholds for raw predictions
-    so as to follow the true distribution.
-    """
-    idxs = np.cumsum(np.bincount(y_true))[:-1]
-    idxs = (idxs * y_pred.size / y_true.size).astype(int)
-    return np.sort(y_pred)[idxs]
 
 
 @jit
@@ -54,8 +50,6 @@ def eval_qwk_lgb_regr(y_pred, train_data, tr_mean, tr_std):
     Fast QWK eval function for lgb.
     """
     labels = train_data.get_label()
-    y_pred = tr_mean + (y_pred - y_pred.mean()) / (y_pred.std() / tr_std)
-    thresholds = [0.5, 1.5, 2.5]
-    y_pred = allocate_to_rate(y_pred, thresholds)
-
+    y_pred = adjust_dist(y_pred, tr_mean, tr_std)
+    y_pred = allocate_to_rate(y_pred)
     return 'kappa', qwk(labels, y_pred), True

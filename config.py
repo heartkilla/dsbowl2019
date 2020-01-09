@@ -5,9 +5,10 @@ specs_path = './data/specs.csv'
 sample_sub_path = './data/sample_submission.csv'
 preprocessed_train_path = './data/preprocessed_train.csv'
 preprocessed_test_path = './data/preprocessed_test.csv'
+preprocessed_test_for_train_path = './data/preprocessed_test_for_train.csv'
 
 # no different categories in train/test for now but be careful
-cat_cols = ['title', 'world']
+cat_cols = ['title', 'world', 'assess_titles_mode', 'assess_titles_lag', 'titles_mode', 'titles_lag']
 
 counts = ['event_code', 'world', 'title', 'title_event_code']
 
@@ -19,7 +20,7 @@ lgb_params = {'objective': 'huber',
               'metric': 'None',
               'num_leaves': 32,
               'max_depth': 7,
-              'min_data_in_leaf': 80,
+              'min_data_in_leaf': 120,
               'learning_rate': 0.01,
               'bagging_fraction': 0.5,
               'bagging_freq': 1,
@@ -33,4 +34,7 @@ lgb_params = {'objective': 'huber',
 
 lgb_train_params = {'num_boost_round': 1000000,
                     'early_stopping_rounds': 500,
-                    'verbose_eval': 100}
+                    'verbose_eval': 100,
+                    'cat_feats': ['world', 'title', 'assess_titles_mode', 'assess_titles_lag']}
+
+entire_train_stats = False

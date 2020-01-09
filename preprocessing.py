@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 from tqdm import tqdm
-from scipy.stats import skew
+from scipy.stats import skew, mode
 
 import config
 
@@ -49,12 +49,11 @@ def preprocess_inst(ins_group, custom_counter, dataset):
     custom_counter.reset()
 
     types = ['Clip', 'Activity', 'Assessment', 'Game']
-    #changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
     type_counter = {'type_' + col + '_count': 0 for col in types}
     last_type = 0
 
     accumulated_correct_attempts = []
-    accumulated_uncorrect_attempts = 0
+    accumulated_uncorrect_attempts = []
     accumulated_accuracy = 0
     assessments = ['Cart Balancer (Assessment)',
                    'Cauldron Filler (Assessment)',
@@ -62,7 +61,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
                    'Mushroom Sorter (Assessment)',
                    'Bird Measurer (Assessment)']
     last_accuracy_title = {'last_accuracy_' + title: np.nan for title in assessments}
-    accuracy_groups = {f'{i}_group_count': 0 for i in range(4)}
+    accuracy_group_count = {f'{i}_group_count': 0 for i in range(4)}
     accumulated_accuracy_group = 0
     accumulated_actions = 0
     accumulated_sessions = 0
@@ -82,6 +81,16 @@ def preprocess_inst(ins_group, custom_counter, dataset):
     change_type_count = 0
 
     accuracies = []
+    accuracy_groups = []
+    last_accuracy_group_title = {'last_accuracy_group_' + title: np.nan for title in assessments}
+
+    session_activity_lens = []
+
+    weekdays = {'weekday_' + str(i): 0 for i in range(7)}
+    hours = {'hour_' + str(i): 0 for i in range(24)}
+
+    assess_titles = []
+    titles = []
 
     k = 0
     for game_session, session_group in ins_group.groupby('game_session',
@@ -107,7 +116,6 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['world'] = session_world
             for counter in custom_counter.counters.values():
                 features.update(counter)
-            #features.update(changed_type_counter)
             features.update(type_counter)
 
             features['accumulated_correct_attempts_mean'] = np.mean(accumulated_correct_attempts) if accumulated_correct_attempts else 0
@@ -117,10 +125,22 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['accumulated_correct_attempts_min'] = np.min(accumulated_correct_attempts) if accumulated_correct_attempts else 0
             features['accumulated_correct_attempts_std'] = np.std(accumulated_correct_attempts) if len(accumulated_correct_attempts) > 1 else 0
             features['accumulated_correct_attempts_skew'] = skew(accumulated_correct_attempts) if len(accumulated_correct_attempts) > 1 else 0
+            features['accumulated_correct_attempts_lag'] = accumulated_correct_attempts[-1] if len(accumulated_correct_attempts) > 0 else 0
+            features['accumulated_correct_attempts_lag_diff'] = accumulated_correct_attempts[-1] - accumulated_correct_attempts[-2] if len(accumulated_correct_attempts) > 1 else 0
 
-            features['accumulated_uncorrect_attempts'] = accumulated_uncorrect_attempts
+            features['accumulated_uncorrect_attempts_mean'] = np.mean(accumulated_uncorrect_attempts) if accumulated_uncorrect_attempts else 0
+            features['accumulated_uncorrect_attempts_median'] = np.median(accumulated_uncorrect_attempts) if accumulated_uncorrect_attempts else 0
+            features['accumulated_uncorrect_attempts_sum'] = np.sum(accumulated_uncorrect_attempts) if accumulated_uncorrect_attempts else 0
+            features['accumulated_uncorrect_attempts_max'] = np.max(accumulated_uncorrect_attempts) if accumulated_uncorrect_attempts else 0
+            features['accumulated_uncorrect_attempts_min'] = np.min(accumulated_uncorrect_attempts) if accumulated_uncorrect_attempts else 0
+            features['accumulated_uncorrect_attempts_std'] = np.std(accumulated_uncorrect_attempts) if len(accumulated_uncorrect_attempts) > 1 else 0
+            features['accumulated_uncorrect_attempts_skew'] = skew(accumulated_uncorrect_attempts) if len(accumulated_uncorrect_attempts) > 1 else 0
+            features['accumulated_uncorrect_attempts_lag'] = accumulated_uncorrect_attempts[-1] if len(accumulated_uncorrect_attempts) > 0 else 0
+            features['accumulated_uncorrect_attempts_lag_diff'] = accumulated_uncorrect_attempts[-1] - accumulated_uncorrect_attempts[-2] if len(accumulated_uncorrect_attempts) > 1 else 0
+
             features['accumulated_accuracy'] = accumulated_accuracy / k if k > 0 else 0
             features.update(last_accuracy_title)
+            features.update(last_accuracy_group_title)
 
             features['assess_duration_mean'] = np.mean(durations) if durations else 0
             features['assess_duration_median'] = np.median(durations) if durations else 0
@@ -129,16 +149,31 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['assess_duration_sum'] = np.sum(durations) if durations else 0
             features['assess_duration_std'] = np.std(durations) if len(durations) > 1 else 0
             features['assess_duration_skew'] = skew(durations) if len(durations) > 1 else 0
+            features['assess_duration_lag'] = durations[-1] if len(durations) > 0 else 0
+            features['assess_duration_lag_diff'] = durations[-1] - durations[-2] if len(durations) > 1 else 0
 
-            features['accuracies_mean'] = np.mean(accuracies) if accuracies else 0
-            features['accuracies_median'] = np.median(accuracies) if accuracies else 0
-            features['accuracies_max'] = np.max(accuracies) if accuracies else 0
-            features['accuracies_min'] = np.min(accuracies) if accuracies else 0
-            features['accuracies_sum'] = np.sum(accuracies) if accuracies else 0
-            features['accuracies_std'] = np.std(accuracies) if len(accuracies) > 1 else 0
-            features['accuracies_skew'] = skew(accuracies) if len(accuracies) > 1 else 0
+            features['accuracies_mean'] = np.mean(accuracies) if accuracies else np.nan
+            features['accuracies_median'] = np.median(accuracies) if accuracies else np.nan
+            features['accuracies_max'] = np.max(accuracies) if accuracies else np.nan
+            features['accuracies_min'] = np.min(accuracies) if accuracies else np.nan
+            features['accuracies_sum'] = np.sum(accuracies) if accuracies else np.nan
+            features['accuracies_std'] = np.std(accuracies) if len(accuracies) > 1 else np.nan
+            features['accuracies_skew'] = skew(accuracies) if len(accuracies) > 1 else np.nan
+            features['accuracies_lag'] = accuracies[-1] if len(accuracies) > 0 else np.nan
+            features['accuracies_lag_diff'] = accuracies[-1] - accuracies[-2] if len(accuracies) > 1 else np.nan
 
-            features.update(accuracy_groups)
+            features['accuracy_groups_mean'] = np.mean(accuracy_groups) if accuracy_groups else np.nan
+            features['accuracy_groups_median'] = np.median(accuracy_groups) if accuracy_groups else np.nan
+            features['accuracy_groups_max'] = np.max(accuracy_groups) if accuracy_groups else np.nan
+            features['accuracy_groups_min'] = np.min(accuracy_groups) if accuracy_groups else np.nan
+            features['accuracy_groups_sum'] = np.sum(accuracy_groups) if accuracy_groups else np.nan
+            features['accuracy_groups_std'] = np.std(accuracy_groups) if len(accuracy_groups) > 1 else np.nan
+            features['accuracy_groups_skew'] = skew(accuracy_groups) if len(accuracy_groups) > 1 else np.nan
+            features['accuracy_groups_lag'] = accuracy_groups[-1] if len(accuracy_groups) > 0 else np.nan
+            features['accuracy_groups_lag_1'] = accuracy_groups[-2] if len(accuracy_groups) > 1 else np.nan
+            features['accuracy_groups_lag_diff'] = accuracy_groups[-1] - accuracy_groups[-2] if len(accuracy_groups) > 1 else np.nan
+
+            features.update(accuracy_group_count)
             features['accumulated_accuracy_group'] = accumulated_accuracy_group / k if k > 0 else 0
             features['accumulated_actions'] = accumulated_actions
             features['accumulated_sessions'] = accumulated_sessions
@@ -155,6 +190,26 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['total_time_sum'] = np.sum(total_times) if total_times else 0
             features['total_time_std'] = np.std(total_times) if len(total_times) > 1 else 0
             features['total_time_skew'] = skew(total_times) if len(total_times) > 1 else 0
+            features['total_time_lag'] = total_times[-1] if len(total_times) > 0 else 0
+            features['total_time_lag_diff'] = total_times[-1] - total_times[-2] if len(total_times) > 1 else 0
+
+            features['session_activity_len_mean'] = np.mean(session_activity_lens) if session_activity_lens else 0
+            features['session_activity_len_median'] = np.median(session_activity_lens) if session_activity_lens else 0
+            features['session_activity_len_max'] = np.max(session_activity_lens) if session_activity_lens else 0
+            features['session_activity_len_min'] = np.min(session_activity_lens) if session_activity_lens else 0
+            features['session_activity_len_sum'] = np.sum(session_activity_lens) if session_activity_lens else 0
+            features['session_activity_len_std'] = np.std(session_activity_lens) if len(session_activity_lens) > 1 else 0
+            features['session_activity_len_skew'] = skew(session_activity_lens) if len(session_activity_lens) > 1 else 0
+            features['session_activity_len_lag'] = session_activity_lens[-1] if len(session_activity_lens) > 0 else 0
+            features['session_activity_len_lag_diff'] = session_activity_lens[-1] - session_activity_lens[-2] if len(session_activity_lens) > 1 else 0
+
+            features['assess_titles_mode'] = mode(assess_titles)[0][0] if assess_titles else 'None'
+            features['assess_titles_nunique'] = len(np.unique(assess_titles)) if assess_titles else 0
+            features['assess_titles_lag'] = assess_titles[-1] if assess_titles else 'None'
+
+            features['titles_mode'] = mode(titles)[0][0] if titles else 'None'
+            features['titles_nunique'] = len(np.unique(titles)) if titles else 0
+            features['titles_lag'] = titles[-1] if titles else 'None'
 
             features['current_title_count'] = custom_counter.counters['title']['title_' + session_title + '_count']
             features['current_world_count'] = custom_counter.counters['world']['world_' + session_world + '_count']
@@ -170,18 +225,21 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features.update(world_game_times)
             features.update(world_activity_times)
             features.update(title_times)
+            features.update(weekdays)
+            features.update(hours)
 
 
             all_attempts = session_group.query(f'event_code == {attempt_code}')
             true_attempts = all_attempts['event_data'].str.contains('"correct":true').sum()
             false_attempts = all_attempts['event_data'].str.contains('"correct":false').sum()
             accumulated_correct_attempts.append(true_attempts)
-            accumulated_uncorrect_attempts += false_attempts
+            accumulated_uncorrect_attempts.append(false_attempts)
             accuracy = true_attempts / (true_attempts + false_attempts) if (true_attempts + false_attempts) != 0 else 0
             accumulated_accuracy += accuracy
             last_accuracy_title['last_accuracy_' + session_title] = accuracy
             durations.append(duration)
             accuracies.append(accuracy)
+            assess_titles.append(session_title)
 
             if accuracy == 0:
                 features['accuracy_group'] = 0
@@ -192,10 +250,12 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             else:
                 features['accuracy_group'] = 1
 
-            accuracy_groups[f"{features['accuracy_group']}_group_count"] += 1
+            accuracy_group_count[f"{features['accuracy_group']}_group_count"] += 1
             accumulated_accuracy_group += features['accuracy_group']
+            accuracy_groups.append(features['accuracy_group'])
+            last_accuracy_group_title['last_accuracy_group_' + session_title] = features['accuracy_group']
 
-            if true_attempts + false_attempts > 0 or dataset != 'train':
+            if true_attempts + false_attempts > 0 or dataset == 'test':
                 all_assessments.append(features)
 
             k += 1
@@ -213,6 +273,9 @@ def preprocess_inst(ins_group, custom_counter, dataset):
                 custom_counter.counters[count_col].update(current_counter)
 
         accumulated_actions += len(session_group)
+        session_activity_lens.append(len(session_group))
+        weekdays['weekday_' + str(session_group.iloc[0, 2].weekday())] += 1
+        hours['hour_' + str(session_group.iloc[0, 2].hour)] += 1
 
         if last_type != session_type:
             change_type_count += 1
@@ -223,6 +286,7 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         total_times.append(duration)
         world_times[session_world + '_world_total_time'] += duration
         title_times[session_title + '_title_total_time'] += duration
+        titles.append(session_group['title'].iloc[0])
 
         if session_type == 'Game':
             world_game_times[session_world + '_world_game_time'] += duration
@@ -263,20 +327,23 @@ def iterative_preprocessing(data, dataset, counter_path='./checkpoints/counter.p
 def main(dataset='train'):
     if dataset == 'train':
         df = pd.read_csv(config.train_path)
-        cat_encoder = CategoricalEncoder(cat_cols=config.cat_cols)
-        cat_encoder.fit(df)
-        with open('./checkpoints/cat_encoder.pkl', 'wb') as fout:
-            pickle.dump(cat_encoder, fout)
     else:
         df = pd.read_csv(config.test_path)
-        with open('./checkpoints/cat_encoder.pkl', 'rb') as fin:
-            cat_encoder = pickle.load(fin)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
 
     df = get_interaction(df, 'title', 'event_code')
 
     df = iterative_preprocessing(df, dataset)
+
+    if dataset == 'train':
+        cat_encoder = CategoricalEncoder(cat_cols=config.cat_cols)
+        cat_encoder.fit(df)
+        with open('./checkpoints/cat_encoder.pkl', 'wb') as fout:
+            pickle.dump(cat_encoder, fout)
+    else:
+        with open('./checkpoints/cat_encoder.pkl', 'rb') as fin:
+            cat_encoder = pickle.load(fin)
 
     df = cat_encoder.transform(df)
 

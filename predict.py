@@ -42,16 +42,16 @@ if __name__ == '__main__':
 
     count_cols = [col for col in X.columns if 'count' in col]
     for col in count_cols:
-        #if 'event_code' in col:
         X[col] = X[col] / X['accumulated_actions']
-        #else:
-        #    X[col] = X[col] / X['accumulated_sessions']
 
     X = X.replace({np.inf: 0})
 
-    preds = model.predict(X)
+    preds = model.predict(X, entire_train_stats=config.entire_train_stats)
 
     sample_submission['accuracy_group'] = preds.astype(int)
     sample_submission.to_csv('./data/submission.csv', index=False)
+
+    with open('./checkpoints/submission.pkl', 'wb') as fout:
+            pickle.dump(sample_submission, fout)
 
     print(sample_submission['accuracy_group'].value_counts(normalize=True))
