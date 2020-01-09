@@ -27,7 +27,7 @@ lgb_params = {'objective': 'huber',
               'feature_fraction': 0.3,
               'feature_fraction_seed': 44,
               'lambda_l1': 0,
-              'lambda_l2': 1,
+              'lambda_l2': 0.3,
               'verbosity': -1,
               'first_metric_only': True,
               'seed': 271828}
