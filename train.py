@@ -43,6 +43,11 @@ if __name__ == '__main__':
     count_cols = [col for col in X.columns if 'count' in col]
     for col in count_cols:
         X[col] = X[col] / X['accumulated_actions']
+        X[col + '_Time_norm'] = X[col] / X['total_time_sum']
+
+    #time_cols = [col for col in X.columns if 'time' in col]
+    #for col in time_cols:
+    #    X[col + '_Time_norm'] = X[col] / X['total_time_sum']
 
     X = X.replace({np.inf: 0})
 
