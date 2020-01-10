@@ -14,8 +14,8 @@ counts = ['event_code', 'world', 'title', 'title_event_code']
 
 n_folds = 5
 
-lgb_params = {'objective': 'huber',
-              'alpha': 2.5,
+lgb_params = {'objective': 'mse',
+              #'alpha': 2.5,
               'boosting': 'gbdt',
               'metric': 'None',
               'num_leaves': 32,
@@ -27,7 +27,7 @@ lgb_params = {'objective': 'huber',
               'feature_fraction': 0.3,
               'feature_fraction_seed': 44,
               'lambda_l1': 0,
-              'lambda_l2': 0.3,
+              'lambda_l2': 0.1,
               'verbosity': -1,
               'first_metric_only': True,
               'seed': 271828}
