@@ -35,6 +35,6 @@ lgb_params = {'objective': 'mse',
 lgb_train_params = {'num_boost_round': 1000000,
                     'early_stopping_rounds': 500,
                     'verbose_eval': 100,
-                    'cat_feats': ['world', 'title', 'assess_titles_mode', 'assess_titles_lag']}
+                    'cat_feats': ['world', 'title', 'assess_titles_lag']}
 
 entire_train_stats = False
