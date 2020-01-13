@@ -18,23 +18,25 @@ lgb_params = {'objective': 'mse',
               #'alpha': 2.5,
               'boosting': 'gbdt',
               'metric': 'None',
-              'num_leaves': 64,
-              'max_depth': 7,
-              'min_data_in_leaf': 80,
+              'num_leaves': 16,
+              'max_depth': 5,
+              'min_data_in_leaf': 100,
               'learning_rate': 0.01,
               'bagging_fraction': 0.35,
               'bagging_freq': 1,
               'feature_fraction': 0.3,
-              'feature_fraction_seed': 44,
+              'feature_fraction_seed': 35,
               'lambda_l1': 0,
               'lambda_l2': 0.1,
               'verbosity': -1,
               'first_metric_only': True,
-              'seed': 271828}
+              'seed': 49}
+
+# CV random QWK:  0.564056+/-0.024703
 
 lgb_train_params = {'num_boost_round': 1000000,
                     'early_stopping_rounds': 500,
                     'verbose_eval': 100,
-                    'cat_feats': ['title']}
+                    'cat_feats': ['assess_titles_mode']}
 
 entire_train_stats = False

@@ -50,9 +50,11 @@ if __name__ == '__main__':
 
     stack_1 = pd.read_csv('./best_submission_1.csv')
     stack_2 = pd.read_csv('./best_submission_2.csv')
+    stack_3 = pd.read_csv('./best_submission_3.csv')
 
     X['feat_1'] = allocate_to_rate(stack_1['accuracy_group'])
     X['feat_2'] = allocate_to_rate(stack_2['accuracy_group'])
+    X['feat_3'] = allocate_to_rate(stack_3['accuracy_group'])
 
     preds = model.predict(X, entire_train_stats=config.entire_train_stats, raw_values=False)
 
