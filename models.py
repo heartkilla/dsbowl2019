@@ -3,6 +3,7 @@ import warnings
 
 import numpy as np
 import lightgbm as lgb
+from sklearn.linear_model import Ridge
 
 from metric import eval_qwk_lgb_regr, adjust_dist, allocate_to_rate, qwk
 
@@ -46,28 +47,22 @@ class LGBMModel:
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-            d_tr = lgb.Dataset(X_tr.drop(columns=self.cols_to_drop), y_tr)
-            d_val = lgb.Dataset(X_val.drop(columns=self.cols_to_drop), y_val)
+            #d_tr = lgb.Dataset(X_tr.drop(columns=self.cols_to_drop), y_tr)
+            #d_val = lgb.Dataset(X_val.drop(columns=self.cols_to_drop), y_val)
 
             tr_mean = y_tr.mean()
             self.tr_means.append(tr_mean)
             tr_std = y_tr.std()
             self.tr_stds.append(tr_std)
 
-            model = lgb.train(self.params, d_tr,
-                              valid_sets=[d_tr, d_val],
-                              feval=partial(eval_qwk_lgb_regr, tr_mean=tr_mean, tr_std=tr_std),
-                              num_boost_round=self.num_boost_round,
-                              early_stopping_rounds=self.early_stopping_rounds,
-                              verbose_eval=self.verbose_eval,
-                              categorical_feature=self.cat_feats)
+            model = Ridge(alpha=100).fit(X_tr.drop(columns=self.cols_to_drop), y_tr)
 
             self.models.append(model)
 
             val_pred = model.predict(X_val.drop(columns=self.cols_to_drop))
             val_pred = adjust_dist(val_pred, tr_mean, tr_std)
-            val_pred = allocate_to_rate(val_pred)
             self.oof_train[val_index] = val_pred
+            val_pred = allocate_to_rate(val_pred)
 
             for i in range(self.n_rand_val):
                 X_rand = X_val.groupby('installation_id').apply(lambda x: x.sample(1, random_state=i)).reset_index(drop=True)
@@ -79,8 +74,8 @@ class LGBMModel:
                 print(f'Rand QWK score {i + 1}: {score:.6f}')
                 self.rand_scores.append(score)
 
-            for dataset in ['training', 'valid_1']:
-                self.scores[dataset].append(model.best_score[dataset]['kappa'])
+           # for dataset in ['training', 'valid_1']:
+            #    self.scores[dataset].append(model.best_score[dataset]['kappa'])
 
             print('-' * 50)
 
@@ -88,7 +83,7 @@ class LGBMModel:
         print(f'CV mean QWK: {np.mean(self.scores["valid_1"]):.6f}+/-{np.std(self.scores["valid_1"]):.6f}')
         print(f'CV random QWK: {np.mean(self.rand_scores):.6f}+/-{np.std(self.rand_scores):.6f}')
 
-    def predict(self, X, entire_train_stats=False):
+    def predict(self, X, entire_train_stats=False, raw_values=False):
         X = X[self.columns]
         preds = np.zeros(X.shape[0])
 
@@ -101,6 +96,8 @@ class LGBMModel:
 
         if entire_train_stats:
             preds = adjust_dist(preds, self.entire_mean, self.entire_std)
-        preds = allocate_to_rate(preds)
+
+        if not raw_values:
+            preds = allocate_to_rate(preds)
 
         return preds

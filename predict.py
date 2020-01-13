@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 import config
+from metric import allocate_to_rate
 
 
 if __name__ == '__main__':
@@ -47,7 +48,13 @@ if __name__ == '__main__':
 
     X = X.replace({np.inf: 0})
 
-    preds = model.predict(X, entire_train_stats=config.entire_train_stats)
+    stack_1 = pd.read_csv('./best_submission_1.csv')
+    stack_2 = pd.read_csv('./best_submission_2.csv')
+
+    X['feat_1'] = allocate_to_rate(stack_1['accuracy_group'])
+    X['feat_2'] = allocate_to_rate(stack_2['accuracy_group'])
+
+    preds = model.predict(X, entire_train_stats=config.entire_train_stats, raw_values=False)
 
     sample_submission['accuracy_group'] = preds.astype(int)
     sample_submission.to_csv('./data/submission.csv', index=False)

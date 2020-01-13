@@ -6,6 +6,7 @@ from sklearn.model_selection import GroupKFold
 
 import config
 from models import LGBMModel
+from metric import allocate_to_rate
 
 
 if __name__ == '__main__':
@@ -50,6 +51,16 @@ if __name__ == '__main__':
     print(X.shape)
 
     y = X['accuracy_group']
+
+    X = X[['accuracy_group', 'installation_id']]
+
+    with open('./best_model_1.pkl', 'rb') as fin:
+        model_1 = pickle.load(fin)
+    with open('./best_model_2.pkl', 'rb') as fin:
+        model_2 = pickle.load(fin)
+
+    X['feat_1'] = allocate_to_rate(model_1.oof_train)
+    X['feat_2'] = allocate_to_rate(model_2.oof_train)
 
     model = LGBMModel(params=config.lgb_params,
                       folds=GroupKFold(n_splits=config.n_folds),
