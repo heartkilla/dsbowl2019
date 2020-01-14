@@ -60,10 +60,19 @@ if __name__ == '__main__':
         model_2 = pickle.load(fin)
     with open('./best_model_3.pkl', 'rb') as fin:
         model_3 = pickle.load(fin)
+    with open('./best_model_4.pkl', 'rb') as fin:
+        model_4 = pickle.load(fin)
+    with open('./best_model_1_new.pkl', 'rb') as fin:
+        model_1_new = pickle.load(fin)
+    with open('./best_model_3_new.pkl', 'rb') as fin:
+        model_3_new = pickle.load(fin)
 
     X['feat_1'] = allocate_to_rate(model_1.oof_train)
     X['feat_2'] = allocate_to_rate(model_2.oof_train)
     X['feat_3'] = allocate_to_rate(model_3.oof_train)
+   # X['prob_2'] = model_4.oof_train[:, 2]
+    X['feat_1_new'] = allocate_to_rate(model_1_new.oof_train)
+    X['feat_3_new'] = allocate_to_rate(model_3_new.oof_train)
 
     model = LGBMModel(params=config.lgb_params,
                       folds=GroupKFold(n_splits=config.n_folds),

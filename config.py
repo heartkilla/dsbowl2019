@@ -25,12 +25,12 @@ lgb_params = {'objective': 'mse',
               'bagging_fraction': 0.35,
               'bagging_freq': 1,
               'feature_fraction': 0.3,
-              'feature_fraction_seed': 35,
+              'feature_fraction_seed': 123,
               'lambda_l1': 0,
               'lambda_l2': 0.1,
               'verbosity': -1,
               'first_metric_only': True,
-              'seed': 49}
+              'seed': 123}
 
 # CV random QWK:  0.564056+/-0.024703
 

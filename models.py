@@ -47,8 +47,8 @@ class LGBMModel:
             X_tr, X_val = X.iloc[tr_index], X.iloc[val_index]
             y_tr, y_val = y.iloc[tr_index], y.iloc[val_index]
 
-            #d_tr = lgb.Dataset(X_tr.drop(columns=self.cols_to_drop), y_tr)
-            #d_val = lgb.Dataset(X_val.drop(columns=self.cols_to_drop), y_val)
+            d_tr = lgb.Dataset(X_tr.drop(columns=self.cols_to_drop), y_tr)
+            d_val = lgb.Dataset(X_val.drop(columns=self.cols_to_drop), y_val)
 
             tr_mean = y_tr.mean()
             self.tr_means.append(tr_mean)
@@ -75,7 +75,7 @@ class LGBMModel:
                 self.rand_scores.append(score)
 
            # for dataset in ['training', 'valid_1']:
-            #    self.scores[dataset].append(model.best_score[dataset]['kappa'])
+           #     self.scores[dataset].append(model.best_score[dataset]['kappa'])
 
             print('-' * 50)
 

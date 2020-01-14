@@ -53,3 +53,12 @@ def eval_qwk_lgb_regr(y_pred, train_data, tr_mean, tr_std):
     y_pred = adjust_dist(y_pred, tr_mean, tr_std)
     y_pred = allocate_to_rate(y_pred)
     return 'kappa', qwk(labels, y_pred), True
+
+
+def eval_qwk_lgb_cls(y_pred, train_data):
+    """
+    Fast QWK eval function for lgb.
+    """
+    labels = train_data.get_label()
+    y_pred = y_pred.reshape(4, -1).argmax(axis=0)
+    return 'kappa', qwk(labels, y_pred), True
