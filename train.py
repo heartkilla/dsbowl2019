@@ -62,7 +62,7 @@ if __name__ == '__main__':
     print(X.shape)
 
     y = X['accuracy_group']
-
+    X.columns = ["".join(c if c.isalnum() else "_" for c in str(x)) for x in X.columns]
     model = LGBMModel(params=config.lgb_params,
                       folds=GroupKFold(n_splits=config.n_folds), #shuffle=True, random_state=73),
                       cols_to_drop=['installation_id', 'accuracy_group'],

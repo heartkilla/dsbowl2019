@@ -10,8 +10,15 @@ import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 from tqdm import tqdm
 from scipy.stats import skew
+from datetime import timedelta
 
 import config
+
+assessments = ['Cart Balancer (Assessment)',
+               'Cauldron Filler (Assessment)',
+               'Chest Sorter (Assessment)',
+               'Mushroom Sorter (Assessment)',
+               'Bird Measurer (Assessment)']
 
 
 class CategoricalEncoder:
@@ -35,7 +42,9 @@ class CustomCounter:
         self.count_unique_keys = {count_col: data[count_col].unique() for count_col in self.count_cols}
 
     def reset(self):
-        self.counters = {count_col: Counter({count_col + '_' + str(key) + '_count': 0 for key in self.count_unique_keys[count_col]}) for count_col in self.count_unique_keys}
+        self.counters = {
+        count_col: Counter({count_col + '_' + str(key) + '_count': 0 for key in self.count_unique_keys[count_col]}) for
+        count_col in self.count_unique_keys}
 
 
 def get_interaction(data, attr_1, attr_2):
@@ -43,24 +52,98 @@ def get_interaction(data, attr_1, attr_2):
     return data
 
 
+def get_accuracy_group(accuracy):
+    if accuracy == 0:
+        return 0
+    elif accuracy == 1:
+        return 3
+    elif accuracy == 0.5:
+        return 2
+    else:
+        return 1
+
+def preprocess_assessments_data(assessment_data):
+    preprocessed_assessments = []
+    for game_session, session_group in assessment_data.groupby("game_session", sort=False):
+        result = {}
+        result["assessment_name"] = session_group.iloc[0]["title"]
+        result["installation_id"] = session_group.iloc[0]["installation_id"]
+        if result["assessment_name"] == 'Bird Measurer (Assessment)':
+            submission_code = 4110
+        else:
+            submission_code = 4100
+        duration = session_group.iloc[-1]["timestamp"] - session_group.iloc[0]["timestamp"]
+        result["duration_seconds"] = duration.seconds
+        submissions = session_group.query(f'event_code == {submission_code}')
+        result["submissions_number"] = len(submissions)
+        result["is_success"] = any(submissions["event_data"].str.contains('"correct":true'))
+        result["accuracy"] = result["is_success"] / result["submissions_number"] if result["submissions_number"] > 0 else 0
+        result["accuracy_group"] = get_accuracy_group(result["accuracy"])
+        result["events_number"] = len(session_group)
+        result["date"] = session_group.iloc[-1]["timestamp"].date()
+        result["submitted"] = result["submissions_number"] > 0
+        preprocessed_assessments.append(result)
+    return pd.DataFrame(preprocessed_assessments).sort_values("date")
+
+
+def get_assessment_daily_statistics(preprocessed_assessments):
+    start_date = preprocessed_assessments["date"].min()
+    end_date = preprocessed_assessments["date"].max()
+    assessments_statistics = []
+    for assessment in assessments:
+        assessment_data = preprocessed_assessments[preprocessed_assessments["assessment_name"] == assessment]
+        for date in pd.date_range(start=start_date, end=end_date):
+            submitted_assessment_by_day = assessment_data[(assessment_data["date"] < date) & (assessment_data["submitted"])]
+            all_assessments_by_day = assessment_data[(assessment_data["date"] < date)]
+            result = {"date": date,
+                      "assessment_name": assessment,
+                      # 1 day is substracted to take the previous day before the current
+                      "that_day_submitted_assessments": len(submitted_assessment_by_day[submitted_assessment_by_day["date"]
+                                            == (date - timedelta(days=1))]),
+                      "that_day_unique_users": submitted_assessment_by_day[submitted_assessment_by_day["date"]
+                                            == (date - timedelta(days=1))]["installation_id"].nunique(),
+                      "duration_mean": np.mean(submitted_assessment_by_day["duration_seconds"]),
+                      "duration_median": np.median(submitted_assessment_by_day["duration_seconds"]),
+                      "duration_std": np.std(submitted_assessment_by_day["duration_seconds"]),
+                      "submissions_number_mean": np.mean(submitted_assessment_by_day["submissions_number"]),
+                      "submissions_number_std": np.std(submitted_assessment_by_day["submissions_number"]),
+                      "success_mean": np.mean(submitted_assessment_by_day["is_success"]),
+                      "success_std": np.std(submitted_assessment_by_day["is_success"]),
+                      "accuracy_mean": np.mean(submitted_assessment_by_day["accuracy"]),
+                      "accuracy_median": np.median(submitted_assessment_by_day["accuracy"]),
+                      "accuracy_std": np.std(submitted_assessment_by_day["accuracy"]),
+                      "event_number_mean": np.mean(submitted_assessment_by_day["events_number"]),
+                      "events_number_median": np.median(submitted_assessment_by_day["events_number"]),
+                      "events_number_std": np.std(submitted_assessment_by_day["events_number"]),
+                      "accuracy_group_1_rate": len(submitted_assessment_by_day["accuracy_group"] == 1) \
+                                               / len(submitted_assessment_by_day) if len(submitted_assessment_by_day) > 0 else 0,
+                      "accuracy_group_2_rate": len(submitted_assessment_by_day["accuracy_group"] == 2) \
+                                               / len(submitted_assessment_by_day) if len(submitted_assessment_by_day) > 0 else 0,
+                      "accuracy_group_3_rate": len(submitted_assessment_by_day["accuracy_group"] == 3) \
+                                               / len(submitted_assessment_by_day) if len(submitted_assessment_by_day) > 0 else 0,
+                      "accuracy_group_4_rate": len(submitted_assessment_by_day["accuracy_group"] == 4) \
+                                               / len(submitted_assessment_by_day) if len(submitted_assessment_by_day) > 0 else 0,
+                      "submission_rate": len(submitted_assessment_by_day) / len(all_assessments_by_day) if len(all_assessments_by_day) > 0 else 0,
+                      # 1 day is substracted to take the previous day before the current
+                      "that_day_all_assessments": len(all_assessments_by_day[all_assessments_by_day["date"]
+                                                                             == (date - timedelta(days=1))])}
+            assessments_statistics.append(result)
+    return pd.DataFrame(assessments_statistics)
+
 def preprocess_inst(ins_group, custom_counter, dataset):
     all_assessments = []
 
     custom_counter.reset()
 
     types = ['Clip', 'Activity', 'Assessment', 'Game']
-    #changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
+    # changed_type_counter = {'changed_type_' + col + '_count': 0 for col in types}
     type_counter = {'type_' + col + '_count': 0 for col in types}
     last_type = 0
 
     accumulated_correct_attempts = []
     accumulated_uncorrect_attempts = 0
     accumulated_accuracy = 0
-    assessments = ['Cart Balancer (Assessment)',
-                   'Cauldron Filler (Assessment)',
-                   'Chest Sorter (Assessment)',
-                   'Mushroom Sorter (Assessment)',
-                   'Bird Measurer (Assessment)']
+
     last_accuracy_title = {'last_accuracy_' + title: np.nan for title in assessments}
     accuracy_groups = {f'{i}_group_count': 0 for i in range(4)}
     accumulated_accuracy_group = 0
@@ -107,16 +190,24 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features['world'] = session_world
             for counter in custom_counter.counters.values():
                 features.update(counter)
-            #features.update(changed_type_counter)
+            # features.update(changed_type_counter)
             features.update(type_counter)
-
-            features['accumulated_correct_attempts_mean'] = np.mean(accumulated_correct_attempts) if accumulated_correct_attempts else 0
-            features['accumulated_correct_attempts_median'] = np.median(accumulated_correct_attempts) if accumulated_correct_attempts else 0
-            features['accumulated_correct_attempts_sum'] = np.sum(accumulated_correct_attempts) if accumulated_correct_attempts else 0
-            features['accumulated_correct_attempts_max'] = np.max(accumulated_correct_attempts) if accumulated_correct_attempts else 0
-            features['accumulated_correct_attempts_min'] = np.min(accumulated_correct_attempts) if accumulated_correct_attempts else 0
-            features['accumulated_correct_attempts_std'] = np.std(accumulated_correct_attempts) if len(accumulated_correct_attempts) > 1 else 0
-            features['accumulated_correct_attempts_skew'] = skew(accumulated_correct_attempts) if len(accumulated_correct_attempts) > 1 else 0
+            features['assessment_date'] = session_group['timestamp'].iloc[0].date()
+            features['assessment_title'] = session_title
+            features['accumulated_correct_attempts_mean'] = np.mean(
+                accumulated_correct_attempts) if accumulated_correct_attempts else 0
+            features['accumulated_correct_attempts_median'] = np.median(
+                accumulated_correct_attempts) if accumulated_correct_attempts else 0
+            features['accumulated_correct_attempts_sum'] = np.sum(
+                accumulated_correct_attempts) if accumulated_correct_attempts else 0
+            features['accumulated_correct_attempts_max'] = np.max(
+                accumulated_correct_attempts) if accumulated_correct_attempts else 0
+            features['accumulated_correct_attempts_min'] = np.min(
+                accumulated_correct_attempts) if accumulated_correct_attempts else 0
+            features['accumulated_correct_attempts_std'] = np.std(accumulated_correct_attempts) if len(
+                accumulated_correct_attempts) > 1 else 0
+            features['accumulated_correct_attempts_skew'] = skew(accumulated_correct_attempts) if len(
+                accumulated_correct_attempts) > 1 else 0
 
             features['accumulated_uncorrect_attempts'] = accumulated_uncorrect_attempts
             features['accumulated_accuracy'] = accumulated_accuracy / k if k > 0 else 0
@@ -170,7 +261,6 @@ def preprocess_inst(ins_group, custom_counter, dataset):
             features.update(world_game_times)
             features.update(world_activity_times)
             features.update(title_times)
-
 
             all_attempts = session_group.query(f'event_code == {attempt_code}')
             true_attempts = all_attempts['event_data'].str.contains('"correct":true').sum()
@@ -229,7 +319,8 @@ def preprocess_inst(ins_group, custom_counter, dataset):
         elif session_type == 'Activity':
             world_activity_times[session_world + '_world_activity_time'] += duration
 
-        accumulated_misses += session_group['event_data'][session_group['event_data'].str.contains('"misses"')].map(lambda x: int(json.loads(x)['misses'])).sum()
+        accumulated_misses += session_group['event_data'][session_group['event_data'].str.contains('"misses"')].map(
+            lambda x: int(json.loads(x)['misses'])).sum()
         all_types_accumulated_correct_attempts += session_group['event_data'].str.contains('"correct":true').sum()
         all_types_accumulated_uncorrect_attempts += session_group['event_data'].str.contains('"correct":false').sum()
 
@@ -267,6 +358,44 @@ def main(dataset='train'):
         cat_encoder.fit(df)
         with open('./checkpoints/cat_encoder.pkl', 'wb') as fout:
             pickle.dump(cat_encoder, fout)
+    elif dataset == 'assessment':
+        train_df = pd.read_csv(config.train_path)
+        assessment_data = train_df[train_df["type"] == "Assessment"].copy(deep=True)
+        del train_df
+        test_df = pd.read_csv(config.test_path)
+        assessment_data = pd.concat([assessment_data, test_df[test_df["type"] == "Assessment"].copy(deep=True)])
+        del test_df
+        assessment_data['timestamp'] = pd.to_datetime(assessment_data['timestamp'], format='%Y-%m-%d %H:%M:%S')
+        preprocessed_assessments_data = preprocess_assessments_data(assessment_data)
+        assessment_daily_statistics = get_assessment_daily_statistics(preprocessed_assessments_data)
+        assessment_daily_statistics.to_csv(config.assessment_path, index=False)
+        return
+    elif dataset == 'merge':
+        preprocessed_train_df = pd.read_csv(config.preprocessed_train_path)
+        preprocessed_train_df['assessment_date'] = \
+            pd.to_datetime(preprocessed_train_df['assessment_date'], format='%Y-%m-%d')
+        assessments = pd.read_csv(config.assessment_path)
+        assessments['date'] = pd.to_datetime(assessments['date'], format='%Y-%m-%d')
+        assessments.columns = ["".join(c if c.isalnum()
+                                                 else "_" for c in str(x)) for x in assessments.columns]
+        assessments["date"] -= pd.Timedelta(days=1)
+        preprocessed_train_df = pd.merge(preprocessed_train_df, assessments, how='left',
+                                         left_on=["assessment_title", "assessment_date"],
+                                         right_on=["assessment_name", "date"])
+        preprocessed_train_df = preprocessed_train_df.drop\
+            (columns=["assessment_name", "date", "assessment_title", "assessment_date"])
+        preprocessed_train_df.to_csv(config.preprocessed_train_path)
+
+        test_for_train = pd.read_csv(config.preprocessed_test_for_train_path)
+        test_for_train['assessment_date'] = \
+            pd.to_datetime(test_for_train['assessment_date'], format='%Y-%m-%d')
+        test_for_train = pd.merge(test_for_train, assessments, how='left',
+                                         left_on=["assessment_title", "assessment_date"],
+                                         right_on=["assessment_name", "date"])
+        test_for_train = test_for_train.drop \
+            (columns=["assessment_name", "date", "assessment_title", "assessment_date"])
+        test_for_train.to_csv(config.preprocessed_test_for_train_path)
+        return
     else:
         df = pd.read_csv(config.test_path)
         with open('./checkpoints/cat_encoder.pkl', 'rb') as fin:
