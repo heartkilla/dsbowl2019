@@ -1,71 +1,40 @@
 import pickle
 
-import numpy as np
 import pandas as pd
 
 import config
 from metric import allocate_to_rate
+from preprocessing import add_final_features
 
 
 if __name__ == '__main__':
     X = pd.read_csv(config.preprocessed_test_path)
     sample_submission = pd.read_csv(config.sample_sub_path)
 
-    with open('./checkpoints/model.pkl', 'rb') as fin:
-        model = pickle.load(fin)
+    with open('./checkpoints/model_1.pkl', 'rb') as fin:
+        model_1 = pickle.load(fin)
+    with open('./checkpoints/model_2.pkl', 'rb') as fin:
+        model_2 = pickle.load(fin)
+    with open('./checkpoints/model_3.pkl', 'rb') as fin:
+        model_3 = pickle.load(fin)
+    with open('./checkpoints/model_1_new.pkl', 'rb') as fin:
+        model_1_new = pickle.load(fin)
+    with open('./checkpoints/model_3_new.pkl', 'rb') as fin:
+        model_3_new = pickle.load(fin)
+    with open('./checkpoints/stacker.pkl', 'rb') as fin:
+        stacker = pickle.load(fin)
 
-    X['hour_sin'] = X['hour'].map(lambda x: np.sin(2 * np.pi * x / 23))
-    X['hour_cos'] = X['hour'].map(lambda x: np.cos(2 * np.pi * x / 23))
-    X = X.drop(columns=['hour'])
+    X = add_final_features(X)
 
-    X['weekday_sin'] = X['weekday'].map(lambda x: np.sin(2 * np.pi * x / 6))
-    X['weekday_cos'] = X['weekday'].map(lambda x: np.cos(2 * np.pi * x / 6))
-    X = X.drop(columns=['weekday'])
+    X['feat_1'] = allocate_to_rate(model_1.predict(X, raw_values=True))
+    X['feat_2'] = allocate_to_rate(model_2.predict(X, raw_values=True))
+    X['feat_3'] = allocate_to_rate(model_3.predict(X, raw_values=True))
+    X['feat_1_new'] = allocate_to_rate(model_1_new.predict(X, raw_values=True))
+    X['feat_3_new'] = allocate_to_rate(model_3_new.predict(X, raw_values=True))
 
-    X['day_sin'] = X['day'].map(lambda x: np.sin(2 * np.pi * x / 6))
-    X['day_cos'] = X['day'].map(lambda x: np.cos(2 * np.pi * x / 6))
-    X = X.drop(columns=['day'])
-
-    X['mean_time_per_day'] = X['total_time_sum'] / X['days_since_installation']
-    X['current_title_mean_time'] = X['current_title_total_time'] / X['current_title_count']
-    X['current_world_mean_time'] = X['current_world_total_time'] / X['current_world_count']
-    X['last_mean_accuracy'] = X[['last_accuracy_Bird Measurer (Assessment)',
-                                 'last_accuracy_Cart Balancer (Assessment)',
-                                 'last_accuracy_Cauldron Filler (Assessment)',
-                                 'last_accuracy_Chest Sorter (Assessment)',
-                                 'last_accuracy_Mushroom Sorter (Assessment)']].mean(axis=1)
-    X['ratio_of_life_in_game'] = X['total_time_sum'] / X['sec_since_installation']
-    X['time_per_session'] = X['total_time_sum'] / X['accumulated_sessions']
-    X['sessions_per_day'] = X['accumulated_sessions'] / X['days_since_installation']
-    X['events_per_session'] = X['accumulated_actions'] / X['accumulated_sessions']
-    X['time_per_event'] = X['total_time_sum'] / X['accumulated_actions']
-    X['events_per_day'] = X['accumulated_actions'] / X['days_since_installation']
-
-    count_cols = [col for col in X.columns if 'count' in col]
-    for col in count_cols:
-        X[col] = X[col] / X['accumulated_actions']
-        X[col + '_Time_norm'] = X[col] / X['total_time_sum']
-
-    X = X.replace({np.inf: 0})
-
-    stack_1 = pd.read_csv('./best_submission_1.csv')
-    stack_2 = pd.read_csv('./best_submission_2.csv')
-    stack_3 = pd.read_csv('./best_submission_3.csv')
-    stack_1_new = pd.read_csv('./best_submission_1_new.csv')
-    stack_3_new = pd.read_csv('./best_submission_3_new.csv')
-
-    X['feat_1'] = allocate_to_rate(stack_1['accuracy_group'])
-    X['feat_2'] = allocate_to_rate(stack_2['accuracy_group'])
-    X['feat_3'] = allocate_to_rate(stack_3['accuracy_group'])
-    X['feat_1_new'] = allocate_to_rate(stack_1_new['accuracy_group'])
-    X['feat_3_new'] = allocate_to_rate(stack_3_new['accuracy_group'])
-
-    preds = model.predict(X, entire_train_stats=config.entire_train_stats, raw_values=False)
+    preds = stacker.predict(X, raw_values=False)
 
     sample_submission['accuracy_group'] = preds.astype(int)
     sample_submission.to_csv('./data/submission.csv', index=False)
-
-    with open('./checkpoints/submission.pkl', 'wb') as fout:
-            pickle.dump(sample_submission, fout)
 
     print(sample_submission['accuracy_group'].value_counts(normalize=True))
