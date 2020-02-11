@@ -88,3 +88,12 @@ As opposed to most of the teams, we didn't spend any time on optimizing the thre
 y_pred =  y_train.mean() + (y_pred_raw - y_pred_raw.mean()) / (y_pred_raw.std() / y_train.std())
 ```
 After that, the predictions were simply rounded to the nearest integer. We didn't notice any significant difference in accuracy between this approach and threshold optimization. However, it helped us to spend less time on thresholding (which may result in overfitting as well) and focus on other things like feature engineering or modeling. In addition, this approach is more desirable since we can directly calculate our validation QWK (and use it for early stopping, for example) without using the true labels.
+
+## 5. How to run the code
+```
+python preprocessing.py train
+python preprocessing.py test_for_train
+python preprocessing.py test
+python train.py
+python predict.py
+```
