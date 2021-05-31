@@ -53,7 +53,7 @@ For the following sequences we calculated: mode, number of unique categories, la
 * Previous assessment titles
 * Previous session titles
 
-### 1.5. Other features
+### 1.4. Other features
 * Last accuracy for each assessment title
 * Last accuracy group for each assessment title
 * Seconds since installation
